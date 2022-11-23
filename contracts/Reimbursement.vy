@@ -124,6 +124,7 @@ def setContractState(_disabled: bool):
 
 @external
 @view
-def getIsTeacher() -> bool:
-    isTeacher: bool = False
-    return self.teachers[msg.sender]
+def getIsTeacher(_teacher: address) -> bool:
+    assert self.teachers[msg.sender]
+
+    return self.teachers[_teacher]
