@@ -36,6 +36,11 @@ event TeacherAdded:
     teacher: address
     label: String[10]
 
+event Payment:
+    sender: indexed(address)
+    amount: uint256
+    bal: uint256
+
 # interface with ERC20 Wolvercoin
 interface Wolvercoin:
     def mint(_to:address , _value: uint256): nonpayable
@@ -52,6 +57,21 @@ def __init__(firstTeacher: address):
 
     self.teachers[firstTeacher] = True
     log TeacherAdded(firstTeacher, "contruct2")
+
+
+# @note Default function is executed on a call to the contract if a non-existing function is called
+# or if none is supplied at all, such as when someone sends it Eth directly
+# @note Payable functions can receive Ether and read from and write to the contract state
+@external
+@payable
+def __default__():
+    log Payment(msg.sender, msg.value, self.balance)
+
+@external
+@payable
+def deposit():
+    log Payment(msg.sender, msg.value, self.balance)
+
 
 @external
 def addTeacher(teacherToAdd: address) -> (bool):
@@ -95,13 +115,6 @@ def refund(recipient: address):
         send(msg.sender, tx.gasprice)
         log GasReimburse(recipient, tx.gasprice)
         return
-    
-@external
-@payable
-def depositMoneyToContract() -> bool:
-    assert not self.disabled
-    return True
-
 
  #   function sendValue(address payable recipient, uint256 amount) internal {
  #       require(address(this).balance >= amount, "Address: insufficient balance");
@@ -125,6 +138,4 @@ def setContractState(_disabled: bool):
 @external
 @view
 def getIsTeacher(_teacher: address) -> bool:
-    assert self.teachers[msg.sender]
-
     return self.teachers[_teacher]
