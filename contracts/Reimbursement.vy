@@ -4,8 +4,10 @@
 studentGraduationYear: HashMap[address, uint256]
 currentGradYear: public(uint256)
 users: public(HashMap[address, uint256])
-teachers: HashMap[address, bool]
-allowance: uint256
+teachers: public(HashMap[address, bool])
+studentIncomeAllowance: uint256
+admin: address
+disabled: bool
 # Payable from solidity
  #   address payable public seller;
 
@@ -22,9 +24,17 @@ allowance: uint256
  #       emit Win(msg.sender, msg.value);
  #   }
 
+ #  ** Proposal for all sub-contracts to have a disable interface **
+ #
+ #
+
 event GasReimburse:
     recipient: address
     amount: uint256
+
+event TeacherAdded:
+    teacher: address
+    label: String[10]
 
 # interface with ERC20 Wolvercoin
 interface Wolvercoin:
@@ -32,21 +42,32 @@ interface Wolvercoin:
     def test1(): nonpayable
 
 @external
-def __init__():
+def __init__(firstTeacher: address):
+    self.disabled = False
+    self.admin = msg.sender
+    self.studentIncomeAllowance = 10
+
     self.teachers[msg.sender] = True
-    self.allowance = 10
+    log TeacherAdded(msg.sender, "contruct")
+
+    self.teachers[firstTeacher] = True
+    log TeacherAdded(firstTeacher, "contruct2")
 
 @external
 def addTeacher(teacherToAdd: address) -> (bool):
+    assert not self.disabled
     # only allow teachers to add another user
     assert self.teachers[msg.sender] == True
 
     # add the teacher
     self.teachers[teacherToAdd] = True
+
+    log TeacherAdded(teacherToAdd, "addTeachFn")
     return True
 
 @external
 def addUserByGraduationDate(studentToAdd: address, graduationYear: uint256) -> (bool):
+    assert not self.disabled
     # only allow teachers to add another user
     assert self.teachers[msg.sender] == True
     self.studentGraduationYear[studentToAdd] = self.currentGradYear
@@ -55,9 +76,10 @@ def addUserByGraduationDate(studentToAdd: address, graduationYear: uint256) -> (
 
 @external
 def bulkMintToken(wolvercoin: Wolvercoin, users: address[5]):
+    assert not self.disabled
     for i in range(5):
         if users[i] != empty(address):
-            wolvercoin.mint(users[i], self.allowance)
+            wolvercoin.mint(users[i], self.studentIncomeAllowance)
 
 @external
 @payable
@@ -77,6 +99,7 @@ def refund(recipient: address):
 @external
 @payable
 def depositMoneyToContract() -> bool:
+    assert not self.disabled
     return True
 
 
@@ -87,3 +110,20 @@ def depositMoneyToContract() -> bool:
  #       require(success, "Address: unable to send value, recipient may have reverted");
  #   }
 
+@external
+@view
+def getTeachers(teacherAddress: address) -> bool:
+    assert not self.disabled
+    assert self.teachers[msg.sender] == True
+    return self.teachers[teacherAddress]
+
+@external
+def setContractState(_disabled: bool):
+    assert self.admin == msg.sender
+    self.disabled = _disabled
+
+@external
+@view
+def getIsTeacher() -> bool:
+    isTeacher: bool = False
+    return self.teachers[msg.sender]
