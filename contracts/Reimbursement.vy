@@ -33,7 +33,11 @@ disabled: bool
 event GasReimburse:
     recipient: address
     amount: uint256
-    success: bool
+
+event OutOfGas:
+    recipient: address
+    amount: uint256
+
 
 event TeacherAdded:
     teacher: address
@@ -107,24 +111,24 @@ def bulkMintToken(wolvercoin: Wolvercoin, users: address[5]):
             wolvercoin.mint(users[i], self.studentIncomeAllowance)
 
 @external
-@payable
 def refund(recipient: address):
     """
         @notice refund refunds the user gas
         @param  recipient address to refund
         Verify they are:
             - A current student
-            - Have fewer than REIMBURSEMENT_COUNT reimbursements
+            - TODO: Have fewer than REIMBURSEMENT_COUNT reimbursements
             - Contract has enough Wei to reimburse
             - ** TODO: Record total reimbursement amount
     """
     assert self.studentGraduationYear[recipient] == self.currentGradYear
 
-    if self.balance >= msg.gas:
-        send(msg.sender, tx.gasprice)
-        log GasReimburse(recipient, tx.gasprice, True)
-    
-    log GasReimburse(recipient, tx.gasprice, False)
+    if self.balance >= (tx.gasprice):
+        send(recipient, tx.gasprice)
+        log GasReimburse(recipient, tx.gasprice)
+        return
+
+    log OutOfGas(recipient, tx.gasprice)
 
 
 @external

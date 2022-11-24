@@ -2,7 +2,6 @@
 import pytest
 import brownie
 import web3
-from web3 import Web3, EthereumTesterProvider
 
 # . This runs before ALL tests
 @pytest.fixture
@@ -36,17 +35,35 @@ def test_canReceiveMoney(reimbursementContract, accounts):
 
 def test_canReimburseMoney(reimbursementContract, accounts):
     # Add money, set grad year, and an active student
-    depositAmount = 1
+    targetReimbursementAccount = accounts[4]
+    depositAmount = 100000
     accounts[0].transfer(reimbursementContract, depositAmount, gas_price=0)
     reimbursementContract.setCurrentGradYear(2023)
-    reimbursementContract.addStudent(accounts[4],  {'from': accounts[1]})
-
-    assert reimbursementContract.getStudentGradYear(accounts[4]) == 2023
+    reimbursementContract.addStudent(targetReimbursementAccount,  {'from': accounts[1]})
+    assert reimbursementContract.getStudentGradYear(targetReimbursementAccount) == 2023
     assert reimbursementContract.balance() == depositAmount, "Contract should be able to receive money"
     
-    reimbursementContract.refund(accounts[4], {'from': accounts[4]})
-    # TODO - Fix this test
-    #assert reimbursementContract.balance() < depositAmount, "Contract should be able to receive money"
+    txn1 = reimbursementContract.refund(targetReimbursementAccount, {'from': targetReimbursementAccount, 'gas_price' : 2100, 'gas' : 2100000})
+    assert len(txn1.events) == 1
+    assert reimbursementContract.balance() < depositAmount, "Contract should have sent eth"
+    assert txn1.events[0]['recipient'] == targetReimbursementAccount
+
+"""
+# This test works and fails...
+def test_willOnlyReimburseStudents(reimbursementContract, accounts):
+    # Add money, set grad year, and an active student
+    depositAmount = 100000
+    accounts[0].transfer(reimbursementContract, depositAmount, gas_price=0)
+    reimbursementContract.setCurrentGradYear(2023)
+    reimbursementContract.addStudent(accounts[3],  {'from': accounts[1]})
+
+    assert reimbursementContract.getStudentGradYear(accounts[3]) == 2023
+    assert reimbursementContract.balance() == depositAmount, "Contract should be able to receive money"
+    
+    txn1 = reimbursementContract.refund(accounts[0], {'from': accounts[0], 'gasPrice' : 10, 'gas' : 0.001})
+    assert txn1.events[0]['success'] == False, "Should only reimburse active students"
+"""
+    
 
 # Test for the following
 """
