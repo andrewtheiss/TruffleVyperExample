@@ -33,6 +33,7 @@ disabled: bool
 event GasReimburse:
     recipient: address
     amount: uint256
+    success: bool
 
 event TeacherAdded:
     teacher: address
@@ -43,13 +44,23 @@ event Payment:
     amount: uint256
     bal: uint256
 
+event SetGradYear:
+    user: address
+    year: uint256
+
 # interface with ERC20 Wolvercoin
 interface Wolvercoin:
     def mint(_to:address , _value: uint256): nonpayable
     def test1(): nonpayable
 
+
 @external
 def __init__(firstTeacher: address):
+    """
+        @notice Sets the reimburesement and refund contract
+        @param firstTeacher is a mandatory teacher address
+    """
+    assert firstTeacher != ZERO_ADDRESS
     self.disabled = False
     self.admin = msg.sender
     self.studentIncomeAllowance = 10
@@ -61,34 +72,32 @@ def __init__(firstTeacher: address):
     log TeacherAdded(firstTeacher, "contruct2")
 
 
-# @note Default function is executed on a call to the contract if a non-existing function is called
-# or if none is supplied at all, such as when someone sends it Eth directly
-# @note Payable functions can receive Ether and read from and write to the contract state
 @external
 @payable
 def __default__():
+    """
+        @notice Default function is executed on a call to the contract if a non-existing function is called
+        or if none is supplied at all, such as when someone sends it Eth directly
+        Payable functions can receive Ether and read from and write to the contract state
+    """
     log Payment(msg.sender, msg.value, self.balance)
 
-@external
-def addTeacher(teacherToAdd: address) -> (bool):
-    assert not self.disabled
-    # only allow teachers to add another user
-    assert self.teachers[msg.sender] == True
 
-    # add the teacher
+#   @note AddTeacher function adds a new teacher and can only be called by active teachers
+@external
+def addTeacher(teacherToAdd: address):
+    assert not self.disabled, "This contract is no longer active"
+    assert self.teachers[msg.sender] == True, "You need to be a teacher to add a teacher."
     self.teachers[teacherToAdd] = True
-
     log TeacherAdded(teacherToAdd, "addTeachFn")
-    return True
+
 
 @external
-def addUserByGraduationDate(studentToAdd: address, graduationYear: uint256) -> (bool):
-    assert not self.disabled
+def addStudent(studentToAdd: address):
+    assert not self.disabled, "This contract and its features are disabled"
     # only allow teachers to add another user
-    assert self.teachers[msg.sender] == True
+    assert self.teachers[msg.sender] == True, "Only teachers can add active students"
     self.studentGraduationYear[studentToAdd] = self.currentGradYear
-    return True
-
 
 @external
 def bulkMintToken(wolvercoin: Wolvercoin, users: address[5]):
@@ -100,38 +109,42 @@ def bulkMintToken(wolvercoin: Wolvercoin, users: address[5]):
 @external
 @payable
 def refund(recipient: address):
-    # .
-    # . assert Recipient is a current student
-    # . assert this contract has enough money to reimburse the student
-    # 
+    """
+        @notice refund refunds the user gas
+        @param  recipient address to refund
+        Verify they are:
+            - A current student
+            - Have fewer than REIMBURSEMENT_COUNT reimbursements
+            - Contract has enough Wei to reimburse
+            - ** TODO: Record total reimbursement amount
+    """
     assert self.studentGraduationYear[recipient] == self.currentGradYear
 
     if self.balance >= msg.gas:
-
         send(msg.sender, tx.gasprice)
-        log GasReimburse(recipient, tx.gasprice)
-        return
+        log GasReimburse(recipient, tx.gasprice, True)
+    
+    log GasReimburse(recipient, tx.gasprice, False)
 
- #   function sendValue(address payable recipient, uint256 amount) internal {
- #       require(address(this).balance >= amount, "Address: insufficient balance");
-
- #       (bool success, ) = recipient.call{value: amount}("");
- #       require(success, "Address: unable to send value, recipient may have reverted");
- #   }
 
 @external
-@view
-def getTeachers(teacherAddress: address) -> bool:
-    assert not self.disabled
-    assert self.teachers[msg.sender] == True
-    return self.teachers[teacherAddress]
-
-@external
-def setContractState(_disabled: bool):
+def setContractState(disabled: bool):
     assert self.admin == msg.sender
-    self.disabled = _disabled
+    self.disabled = disabled
 
 @external
 @view
-def getTeacher(_teacher: address) -> bool:
-    return self.teachers[_teacher]
+def getTeacher(teacher: address) -> bool:
+    return self.teachers[teacher]
+
+@external
+@view
+def getStudentGradYear(student: address) -> uint256:
+
+    return self.studentGraduationYear[student]
+
+@external
+def setCurrentGradYear(year: uint256):
+    assert self.teachers[msg.sender] == True, "Only teachers can add active students"
+    self.currentGradYear = year
+    log SetGradYear(msg.sender, year)
