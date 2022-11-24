@@ -1,7 +1,7 @@
-# TruffleVyperExample
+# Vyper Example using Brownie for Compiling
 
-# Usage
-### **Running:** After installing truffle:
->   truffle build
->   truffle deploy --reset
->   truffle test
+> . https://github.com/eth-brownie/brownie
+> . https://eth-brownie.readthedocs.io/en/latest/quickstart.html
+
+>  ##**Commands**
+> > brownie compile

@@ -1,3 +1,5 @@
+# @version ^0.3.7
+
 # look into interface import https://vyper.readthedocs.io/en/stable/interfaces.html
 
 # TODO - Grab the following from other contracts via an interface
@@ -68,12 +70,6 @@ def __default__():
     log Payment(msg.sender, msg.value, self.balance)
 
 @external
-@payable
-def deposit():
-    log Payment(msg.sender, msg.value, self.balance)
-
-
-@external
 def addTeacher(teacherToAdd: address) -> (bool):
     assert not self.disabled
     # only allow teachers to add another user
@@ -137,5 +133,5 @@ def setContractState(_disabled: bool):
 
 @external
 @view
-def getIsTeacher(_teacher: address) -> bool:
+def getTeacher(_teacher: address) -> bool:
     return self.teachers[_teacher]
