@@ -54,7 +54,7 @@ def test_canReimburseMoney(reimbursementContract, accounts):
     assert reimbursementContract.balance() == depositAmount, "Contract should have eth"
     reimbursementContract.setCurrentGradYear(2023)
     reimbursementContract.addUser(targetReimbursementAccount,  {'from': accounts[1]})
-    txn1 = reimbursementContract.reimburseGas(targetReimbursementAccount, {'from': targetReimbursementAccount, 'gas_price' : txnGasPriceToRepay, 'gas' : DEFAULT_GAS})
+    txn1 = reimbursementContract._reimburseGas(targetReimbursementAccount, {'from': targetReimbursementAccount, 'gas_price' : txnGasPriceToRepay, 'gas' : DEFAULT_GAS})
     assert reimbursementContract.balance() < depositAmount, "Contract should have sent eth"
     
     # Verify log is correct
@@ -63,29 +63,26 @@ def test_canReimburseMoney(reimbursementContract, accounts):
     assert txn1.events[0]['amount'] == txnGasPriceToRepay
     assert reimbursementContract.balance() == (depositAmount - txnGasPriceToRepay)
 
-# TODO - test Gwei reimbusement cap is Gwei and not eth
 # TODO- adjust this for 'internal' contract calls
 # @Notice Relies on 'canAddUser', and 'canReimburseMoney'
 def test_userHitMaxReimbursement(reimbursementContract, accounts):
     adminAccount = accounts[1]
     targetReimbursementAccount = accounts[4]
-    depositAmount = 1
-    totalReimbursementAllowed = _as_wei_value(0.01, "eth")
+    depositAmount = _as_wei_value(0.011, "ether")
+    totalReimbursementAllowed = _as_wei_value(0.01, "ether")
 
     # Add money, set grad year, and an active user
     accounts[0].transfer(reimbursementContract, depositAmount, gas_price=0)
     reimbursementContract.setCurrentGradYear(2023)
     reimbursementContract.addUser(targetReimbursementAccount,  {'from': adminAccount})
-    txn1 = reimbursementContract.setUserIndividualWeiReimbursementCap(totalReimbursementAllowed, {'from': adminAccount, 'gas_price' : 2100, 'gas' : 2100000})
-    """
-    txn2 = reimbursementContract.reimburseGas(targetReimbursementAccount, {'from': targetReimbursementAccount, 'gas_price' : 2100, 'gas' : 2100})
+    txn1 = reimbursementContract.setUserIndividualWeiReimbursementCap(totalReimbursementAllowed, {'from': adminAccount, 'gas_price' : 2100, 'gas' : DEFAULT_GAS})
+    txn2 = reimbursementContract._reimburseGas(targetReimbursementAccount, {'from': targetReimbursementAccount, 'gas_price' : 2100, 'gas' : DEFAULT_GAS})
     assert len(txn2.events) == 1
     #assert reimbursementContract.balance() < depositAmount, "Contract should have sent eth"
     #assert reimbursementContract.getGweiReimbursed(True, {'from':targetReimbursementAccount}) < 0
-    assert reimbursementContract.balance() < 1, "Contract should have sent eth"
+    assert reimbursementContract.balance() < depositAmount, "Contract should have sent eth"
     #assert txn1.events[0]['recipient'] == targetReimbursementAccount
 
-"""
 # test contract out of eth to reimburse
 
 """

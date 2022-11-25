@@ -101,19 +101,20 @@ def bulkMintToken(wolvercoin: Wolvercoin, users: address[5]):
         if users[i] != empty(address):
             wolvercoin.mint(users[i], self.userCoinAllowance)
 
-
-# TODO: make internal..
-@external
-def reimburseGas(recipient: address):
+@internal
+def _reimburseGas(recipient: address):
     """
-        @notice reimburse the user gwei
+        @notice reimburse the user wei
         @param  recipient address to reimburse
           Verifies they are a current user, will fail WHOLE TXN if they aren't
           Checks contract has enough Wei to reimburse
           Records total per-user reimbursement amount
     """
     assert not self.disabled, "This contract and its features are disabled"
-    assert self.userGraduationYear[recipient] == self.currentGradYear
+
+    # Will not reimburse graduates...
+    if self.userGraduationYear[recipient] != self.currentGradYear:
+        return
     
     if self.balance <= tx.gasprice:
         log ContractOutOfGas(recipient, tx.gasprice)
