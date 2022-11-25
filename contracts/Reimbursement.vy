@@ -5,7 +5,7 @@ userGraduationYear: HashMap[address, uint256]
 userCoinAllowance: public(uint256)
 userCoinAllowanceToPayout: public(HashMap[address, uint256])
 
-userIndividualGweiReimbursementCap: public(uint256)
+userIndividualWeiReimbursementCap: public(uint256)
 userGweiReimbursed: HashMap[address, uint256]
 
 admins: public(HashMap[address, bool])
@@ -44,14 +44,14 @@ interface Wolvercoin:
 @external
 def __init__(initialAdmin: address):
     """
-        @notice Sets the reimburesement and refund contract
+        @notice Sets the reimburesement and reimburseGas contract
         @param initialAdmin is a mandatory admin address
     """
     assert initialAdmin != empty(address)
     self.disabled = False
     self.owner = msg.sender
     self.userCoinAllowance = 10
-    self.userIndividualGweiReimbursementCap = 210000
+    self.userIndividualWeiReimbursementCap = as_wei_value(0.01, "ether")
 
     self.admins[msg.sender] = True
     self.admins[initialAdmin] = True
@@ -78,8 +78,8 @@ def addAdmin(adminToAdd: address):
         @param  adminToAdd is the admin to input
         can only be called by existing admin / owner
     """
-    assert adminToAdd != empty(address), "Cannot add the 0 address as admin"
     assert not self.disabled, "This contract is no longer active"
+    assert adminToAdd != empty(address), "Cannot add the 0 address as admin"
     assert self.admins[msg.sender] == True, "You need to be a teacher to add a teacher."
     self.admins[adminToAdd] = True
     log AdminAdded(adminToAdd, "add admin")
@@ -95,7 +95,8 @@ def addUser(userToAdd: address):
 
 @external
 def bulkMintToken(wolvercoin: Wolvercoin, users: address[5]):
-    assert not self.disabled
+    assert not self.disabled, "This contract and its features are disabled"
+    assert self.admins[msg.sender] == True, "Only admins can add bulk mint coins"
     for i in range(5):
         if users[i] != empty(address):
             wolvercoin.mint(users[i], self.userCoinAllowance)
@@ -103,28 +104,29 @@ def bulkMintToken(wolvercoin: Wolvercoin, users: address[5]):
 
 # TODO: make internal..
 @external
-def refund(recipient: address):
+def reimburseGas(recipient: address):
     """
-        @notice refund the user gwei
-        @param  recipient address to refund
+        @notice reimburse the user gwei
+        @param  recipient address to reimburse
           Verifies they are a current user, will fail WHOLE TXN if they aren't
           Checks contract has enough Wei to reimburse
           Records total per-user reimbursement amount
     """
+    assert not self.disabled, "This contract and its features are disabled"
     assert self.userGraduationYear[recipient] == self.currentGradYear
     
     if self.balance <= tx.gasprice:
         log ContractOutOfGas(recipient, tx.gasprice)
         return
 
-    if self.userIndividualGweiReimbursementCap > (self.userGweiReimbursed[recipient] + tx.gasprice):
+    if self.userIndividualWeiReimbursementCap > (self.userGweiReimbursed[recipient] + tx.gasprice):
         self.userGweiReimbursed[recipient] += tx.gasprice
         send(recipient, tx.gasprice)
     
     log GasReimburse(
         recipient, 
         tx.gasprice,
-        self.userIndividualGweiReimbursementCap, 
+        self.userIndividualWeiReimbursementCap, 
         self.userGweiReimbursed[recipient]
     )
 
@@ -142,6 +144,7 @@ def getAdmin(userToCheck: address) -> bool:
 
 @external
 def setCurrentGradYear(year: uint256):
+    assert not self.disabled, "This contract and its features are disabled"
     assert self.admins[msg.sender] == True, "Only admins can add active students"
     self.currentGradYear = year
     log SetGradYear(msg.sender, year) 
@@ -150,3 +153,14 @@ def setCurrentGradYear(year: uint256):
 @view
 def getUserGradYear(student: address) -> uint256:
     return self.userGraduationYear[student]
+
+@external
+def setUserIndividualWeiReimbursementCap(cap: uint256):
+    assert not self.disabled, "This contract and its features are disabled"
+    assert self.admins[msg.sender] == True, "Only admins can add active students"
+    self.userIndividualWeiReimbursementCap = cap
+
+@external
+@view
+def getGweiReimbursed(dummy: bool) -> uint256:
+    return self.userGweiReimbursed[msg.sender]
