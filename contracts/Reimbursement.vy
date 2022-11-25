@@ -2,9 +2,6 @@
 currentGradYear: public(uint256)
 userGraduationYear: HashMap[address, uint256]
 
-userCoinAllowance: public(uint256)
-userCoinAllowanceToPayout: public(HashMap[address, uint256])
-
 userIndividualWeiReimbursementCap: public(uint256)
 userWeiReimbursed: HashMap[address, uint256]
 WEI_REIMBURSEMENT_BUFFER: constant(uint256) = as_wei_value(0.0005, "ether")
@@ -36,12 +33,6 @@ event SetGradYear:
     user: address
     year: uint256
 
-# interface with ERC20 Wolvercoin
-interface Wolvercoin:
-    def mint(_to:address , _value: uint256): nonpayable
-    def test1(): nonpayable
-
-
 @external
 def __init__(initialAdmin: address):
     """
@@ -51,7 +42,6 @@ def __init__(initialAdmin: address):
     assert initialAdmin != empty(address)
     self.disabled = False
     self.owner = msg.sender
-    self.userCoinAllowance = 10
     self.userIndividualWeiReimbursementCap = as_wei_value(0.01, "ether")
 
     self.admins[msg.sender] = True
@@ -92,16 +82,6 @@ def addUser(userToAdd: address):
     assert userToAdd != empty(address), "Cannot add the 0 address as a user"
     assert self.admins[msg.sender] == True, "Only admins can add active users"
     self.userGraduationYear[userToAdd] = self.currentGradYear
-
-
-@external
-def bulkMintToken(wolvercoin: Wolvercoin, users: address[5]):
-    assert not self.disabled, "This contract and its features are disabled"
-    assert self.admins[msg.sender] == True, "Only admins can add bulk mint coins"
-    for i in range(5):
-        if users[i] != empty(address):
-            wolvercoin.mint(users[i], self.userCoinAllowance)
-
 
 @internal
 def _reimburseGas(recipient: address, amount: uint256):
