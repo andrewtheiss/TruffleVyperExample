@@ -61,8 +61,8 @@ def __init__(initialAdmin: address):
     log AdminAdded(initialAdmin, "init admin")
 
 
-@external
 @payable
+@external
 def __default__():
     """
         @notice Default function is executed on a call to the contract if a non-existing function is called
@@ -102,6 +102,7 @@ def bulkMintToken(wolvercoin: Wolvercoin, users: address[5]):
         if users[i] != empty(address):
             wolvercoin.mint(users[i], self.userCoinAllowance)
 
+
 @internal
 def _reimburseGas(recipient: address, amount: uint256):
     """
@@ -133,6 +134,12 @@ def _reimburseGas(recipient: address, amount: uint256):
         self.userWeiReimbursed[recipient]
     )
 
+
+@external
+def reimburseGas(recipient: address):
+    self._reimburseGas(recipient, tx.gasprice)
+
+
 @external
 def setDisableContract(disabled: bool):
     assert self.owner == msg.sender
@@ -144,6 +151,7 @@ def setDisableContract(disabled: bool):
 def getAdmin(userToCheck: address) -> bool:
     return self.admins[userToCheck]
 
+
 @external
 def setCurrentGradYear(year: uint256):
     assert not self.disabled, "This contract and its features are disabled"
@@ -151,10 +159,12 @@ def setCurrentGradYear(year: uint256):
     self.currentGradYear = year
     log SetGradYear(msg.sender, year) 
 
+
 @view
 @external
 def getUserGradYear(student: address) -> uint256:
     return self.userGraduationYear[student]
+
 
 @external
 def setUserIndividualWeiReimbursementCap(cap: uint256):
@@ -162,15 +172,12 @@ def setUserIndividualWeiReimbursementCap(cap: uint256):
     assert self.admins[msg.sender] == True, "Only admins can add active students"
     self.userIndividualWeiReimbursementCap = cap
 
-@external
+
 @view
+@external
 def getWeiReimbursed(dummy: bool) -> uint256:
     return self.userWeiReimbursed[msg.sender]
 
-
-@external
-def reimburseGas(recipient: address):
-    self._reimburseGas(recipient, tx.gasprice)
 
 @view
 @external
