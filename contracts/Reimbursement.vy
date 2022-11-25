@@ -6,7 +6,8 @@ userCoinAllowance: public(uint256)
 userCoinAllowanceToPayout: public(HashMap[address, uint256])
 
 userIndividualWeiReimbursementCap: public(uint256)
-userGweiReimbursed: HashMap[address, uint256]
+userWeiReimbursed: HashMap[address, uint256]
+WEI_REIMBURSEMENT_BUFFER: constant(uint256) = as_wei_value(0.0005, "ether")
 
 admins: public(HashMap[address, bool])
 owner: address
@@ -20,7 +21,7 @@ event GasReimburse:
 
 event ContractOutOfGas:
     recipient: address
-    amount: uint256
+    amountNotReimbursed: uint256
 
 event AdminAdded:
     admin: address
@@ -102,13 +103,14 @@ def bulkMintToken(wolvercoin: Wolvercoin, users: address[5]):
             wolvercoin.mint(users[i], self.userCoinAllowance)
 
 @internal
-def _reimburseGas(recipient: address):
+def _reimburseGas(recipient: address, amount: uint256):
     """
         @notice reimburse the user wei
         @param  recipient address to reimburse
-          Verifies they are a current user, will fail WHOLE TXN if they aren't
+          Verifies they are a current user
           Checks contract has enough Wei to reimburse
           Records total per-user reimbursement amount
+          Need to grab msg.gas before and msg.gas after to find amount
     """
     assert not self.disabled, "This contract and its features are disabled"
 
@@ -116,30 +118,29 @@ def _reimburseGas(recipient: address):
     if self.userGraduationYear[recipient] != self.currentGradYear:
         return
     
-    if self.balance <= tx.gasprice:
-        log ContractOutOfGas(recipient, tx.gasprice)
+    if self.balance < (WEI_REIMBURSEMENT_BUFFER + amount):
+        log ContractOutOfGas(recipient, amount)
         return
 
-    if self.userIndividualWeiReimbursementCap > (self.userGweiReimbursed[recipient] + tx.gasprice):
-        self.userGweiReimbursed[recipient] += tx.gasprice
-        send(recipient, tx.gasprice)
+    if self.userIndividualWeiReimbursementCap >= (self.userWeiReimbursed[recipient] + amount):
+        self.userWeiReimbursed[recipient] += amount
+        send(recipient, amount)
     
     log GasReimburse(
         recipient, 
-        tx.gasprice,
+        amount,
         self.userIndividualWeiReimbursementCap, 
-        self.userGweiReimbursed[recipient]
+        self.userWeiReimbursed[recipient]
     )
 
-
-
 @external
-def setContractState(disabled: bool):
+def setDisableContract(disabled: bool):
     assert self.owner == msg.sender
     self.disabled = disabled
 
-@external
+
 @view
+@external
 def getAdmin(userToCheck: address) -> bool:
     return self.admins[userToCheck]
 
@@ -150,8 +151,8 @@ def setCurrentGradYear(year: uint256):
     self.currentGradYear = year
     log SetGradYear(msg.sender, year) 
 
-@external
 @view
+@external
 def getUserGradYear(student: address) -> uint256:
     return self.userGraduationYear[student]
 
@@ -163,5 +164,15 @@ def setUserIndividualWeiReimbursementCap(cap: uint256):
 
 @external
 @view
-def getGweiReimbursed(dummy: bool) -> uint256:
-    return self.userGweiReimbursed[msg.sender]
+def getWeiReimbursed(dummy: bool) -> uint256:
+    return self.userWeiReimbursed[msg.sender]
+
+
+@external
+def reimburseGas(recipient: address):
+    self._reimburseGas(recipient, tx.gasprice)
+
+@view
+@external
+def getUserInidividualWeiReimbursementCap() -> uint256:
+    return self.userIndividualWeiReimbursementCap
