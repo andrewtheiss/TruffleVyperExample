@@ -16,3 +16,7 @@
 > TODO: install dependency
 > > https://pypi.python.org/pypi/pytest_dependency 
 > > @pytest.mark.dependency(depends=["test_canSetGradYear, test_canReceiveMoney"])
+
+
+# Compile and generate ABI for deployment or UI testing 
+>> vyper -f abi,bytecode,bytecode_runtime,ir,asm,source_map,method_identifiers ./contracts/Reimbursement.vy

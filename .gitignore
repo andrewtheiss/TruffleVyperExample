@@ -1,4 +1,4 @@
 /build/contracts/*.json
 build/
-
+node_modules/
 tests/__pycache__/

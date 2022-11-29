@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@drizzle/store": "^1.5.3"
+  }
+}
