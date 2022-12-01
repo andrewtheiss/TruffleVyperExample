@@ -23,11 +23,12 @@
 
 
 
->  ##**Compiling Commands**
-> > ** To compile Code**
-> > brownie compile
+>  ## **Compiling Commands**
+> brownie compile
+> vyper -f abi,bytecode,bytecode_runtime,ir,asm,source_map,method_identifiers ./contracts/Reimbursement.vy
 
-# Testings Installation Instructions
+
+### Further Development of this Repo: Testings Installation Instructions
 > ** Python testing will show warnings by default**
 > > To turn them off, modify the pytest.ini file as mentioned here: 
 > https://docs.pytest.org/en/stable/how-to/capture-warnings.html
@@ -35,7 +36,3 @@
 > TODO: install dependency
 > > https://pypi.python.org/pypi/pytest_dependency 
 > > @pytest.mark.dependency(depends=["test_canSetGradYear, test_canReceiveMoney"])
-
-
-# Compile and generate ABI for deployment or UI testing 
->> vyper -f abi,bytecode,bytecode_runtime,ir,asm,source_map,method_identifiers ./contracts/Reimbursement.vy
