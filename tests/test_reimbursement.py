@@ -46,10 +46,6 @@ def test_canReceiveMoney(reimbursementContract, accounts):
     accounts[2].transfer(reimbursementContract, depositAmount, gas_price=0)
     assert reimbursementContract.balance() == (depositAmount * 2), "Contract should be able to receive money"
 
-#def test_isElligibleForReimbursement(reimburesementContract, accounts):
-#    assert 
-
-
 # @Notice Relies on 'canDisabled' 'canAddUser'
 def test_canReimburseMoney(reimbursementContract, accounts):
 
