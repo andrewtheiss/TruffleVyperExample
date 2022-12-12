@@ -1,14 +1,16 @@
 # @version ^0.3.7
-currentGradYear: public(uint256)
-userGraduationYear: HashMap[address, uint256]
 
 userIndividualWeiReimbursementCap: public(uint256)
 userWeiReimbursed: HashMap[address, uint256]
 WEI_REIMBURSEMENT_BUFFER: constant(uint256) = as_wei_value(0.0005, "ether")
-
-admins: public(HashMap[address, bool])
-owner: address
 disabled: bool
+owner: address
+
+interface ActiveUser:
+    def getActiveUser(potentialUser: address) -> bool: view
+    def getAdmin(potentialAdmin: address) -> bool: view
+
+activeUserAddress: public(ActiveUser)
 
 event GasReimburse:
     recipient: address
@@ -20,35 +22,21 @@ event ContractOutOfGas:
     recipient: address
     amountNotReimbursed: uint256
 
-event AdminAdded:
-    admin: address
-    label: String[10]
-
 event Payment:
     sender: indexed(address)
     amount: uint256
     bal: uint256
 
-event SetGradYear:
-    user: address
-    year: uint256
-
 @external
-def __init__(initialAdmin: address):
+def __init__(activeUserAddress: address):
     """
         @notice Sets the reimburesement and reimburseGas contract
-        @param initialAdmin is a mandatory admin address
+        @param activeUserAddress is a mandatory address of the activeUsers contract
     """
-    assert initialAdmin != empty(address)
-    self.disabled = False
+    self.activeUserAddress = ActiveUser(activeUserAddress)
     self.owner = msg.sender
+    self.disabled = False
     self.userIndividualWeiReimbursementCap = as_wei_value(0.01, "ether")
-
-    self.admins[msg.sender] = True
-    self.admins[initialAdmin] = True
-
-    log AdminAdded(msg.sender, "init owner")
-    log AdminAdded(initialAdmin, "init admin")
 
 
 @payable
@@ -60,28 +48,6 @@ def __default__():
         Payable functions can receive Ether and read from and write to the contract state
     """
     log Payment(msg.sender, msg.value, self.balance)
-
-
-@external
-def addAdmin(adminToAdd: address):
-    """
-        @notice addAdmin function adds a new admin
-        @param  adminToAdd is the admin to input
-        can only be called by existing admin / owner
-    """
-    assert not self.disabled, "This contract is no longer active"
-    assert adminToAdd != empty(address), "Cannot add the 0 address as admin"
-    assert self.admins[msg.sender] == True, "You need to be a teacher to add a teacher."
-    self.admins[adminToAdd] = True
-    log AdminAdded(adminToAdd, "add admin")
-
-
-@external
-def addUser(userToAdd: address):
-    assert not self.disabled, "This contract and its features are disabled"
-    assert userToAdd != empty(address), "Cannot add the 0 address as a user"
-    assert self.admins[msg.sender] == True, "Only admins can add active users"
-    self.userGraduationYear[userToAdd] = self.currentGradYear
 
 @internal
 def _reimburseGas(recipient: address, amount: uint256):
@@ -96,7 +62,7 @@ def _reimburseGas(recipient: address, amount: uint256):
     assert not self.disabled, "This contract and its features are disabled"
 
     # Will not reimburse graduates...
-    if self.userGraduationYear[recipient] != self.currentGradYear:
+    if not self.activeUserAddress.getActiveUser(recipient):
         return
     
     if self.balance < (WEI_REIMBURSEMENT_BUFFER + amount):
@@ -122,44 +88,32 @@ def reimburseGas(recipient: address):
 
 @external
 def setDisableContract(disabled: bool):
-    assert self.owner == msg.sender
+    assert self._isOwnerOrAdmin() == True, "Only admin or owner can disable the contract"
     self.disabled = disabled
 
-
-@view
-@external
-def getAdmin(userToCheck: address) -> bool:
-    return self.admins[userToCheck]
-
-
-@external
-def setCurrentGradYear(year: uint256):
-    assert not self.disabled, "This contract and its features are disabled"
-    assert self.admins[msg.sender] == True, "Only admins can add active students"
-    self.currentGradYear = year
-    log SetGradYear(msg.sender, year) 
-
-
-@view
-@external
-def getUserGradYear(student: address) -> uint256:
-    return self.userGraduationYear[student]
-
+@internal
+def _isOwnerOrAdmin() -> bool:
+    isOwner: bool = (self.owner == msg.sender)
+    isAdmin: bool = self.activeUserAddress.getAdmin(msg.sender)
+    return isOwner or isAdmin
 
 @external
 def setUserIndividualWeiReimbursementCap(cap: uint256):
     assert not self.disabled, "This contract and its features are disabled"
-    assert self.admins[msg.sender] == True, "Only admins can add active students"
+    assert self._isOwnerOrAdmin() == True, "Only admin or owner can disable the contract"
     self.userIndividualWeiReimbursementCap = cap
-
 
 @view
 @external
 def getWeiReimbursed(dummy: bool) -> uint256:
     return self.userWeiReimbursed[msg.sender]
 
-
 @view
 @external
 def getUserInidividualWeiReimbursementCap() -> uint256:
     return self.userIndividualWeiReimbursementCap
+
+@view
+@external 
+def getOwner() -> address:
+    return self.owner

@@ -7,8 +7,14 @@ DEFAULT_GAS = 100000
 
 # . This runs before ALL tests
 @pytest.fixture
-def reimbursementContract(Reimbursement, accounts):
-    return Reimbursement.deploy(accounts[1], {'from': accounts[0]})
+def reimbursementContract(Reimbursement, ActiveUser, accounts):
+    activeUserContract = ActiveUser.deploy(accounts[0], {'from':accounts[1]})
+    activeUserContract.setCurrentGradYear(2022)
+    activeUserContract.addUser(accounts[2])
+    activeUserContract.setCurrentGradYear(2023)
+    activeUserContract.addUser(accounts[3])
+    return Reimbursement.deploy(activeUserContract, {'from': accounts[1]})
+
 
 def _as_wei_value(base, conversion):
     if conversion == "wei":
@@ -18,24 +24,7 @@ def _as_wei_value(base, conversion):
     return base * (10 ** 18)
 
 def test_contractDeployment(reimbursementContract, accounts):
-    assert reimbursementContract.getAdmin(accounts[0]) == True, "Contract creator should be a admin"
-    assert reimbursementContract.getAdmin(accounts[1]) == True, "Contract constructor should enter a single admin"
-    assert reimbursementContract.getAdmin(accounts[2]) == False, "Random accounts should not be admins"
-
-def test_canAddAdmin(reimbursementContract, accounts):   
-    assert reimbursementContract.getAdmin(accounts[3]) == False, "User should not be admin before test"
-    reimbursementContract.addAdmin(accounts[3],  {'from': accounts[0]})
-    assert reimbursementContract.getAdmin(accounts[3]) == True, "Contract constructor should add an single admin"
-
-def test_canSetGradYear(reimbursementContract, accounts):
-    txn1 = reimbursementContract.setCurrentGradYear(2023)
-    assert len(txn1.events) == 1, "Should log when grad year is set"
-    assert reimbursementContract.currentGradYear() == 2023, "Should set grad year"
-
-def test_canAddUser(reimbursementContract, accounts):
-    reimbursementContract.setCurrentGradYear(2023)
-    reimbursementContract.addUser(accounts[4],  {'from': accounts[1]})
-    assert reimbursementContract.getUserGradYear(accounts[4]) == 2023, "Should set user grad year"
+    assert reimbursementContract.getOwner() == accounts[1], "Contract creator should be owner"
 
 def test_canDisable(reimbursementContract, accounts):
     ownerAccount = accounts[0]
@@ -43,13 +32,13 @@ def test_canDisable(reimbursementContract, accounts):
     randomAccount = accounts[5] 
 
     with pytest.raises(Exception) as e_info:
-        txn0 = reimbursementContract.setDisableContract(True, {'from':adminAccount})
+        txn0 = reimbursementContract.setDisableContract(True, {'from':randomAccount})
 
-    with pytest.raises(Exception) as e_info:
-        txn1 = reimbursementContract.setDisableContract(True, {'from':randomAccount})
+    txn1 = reimbursementContract.setDisableContract(True, {'from':adminAccount})
+    txn2 = reimbursementContract.setDisableContract(False, {'from':adminAccount})
 
-    txn2 = reimbursementContract.setDisableContract(True, {'from':ownerAccount})
-    txn3 = reimbursementContract.setDisableContract(False, {'from':ownerAccount})
+    txn3 = reimbursementContract.setDisableContract(True, {'from':ownerAccount})
+    txn4 = reimbursementContract.setDisableContract(False, {'from':ownerAccount})
 
 def test_canReceiveMoney(reimbursementContract, accounts):
     depositAmount = 1
@@ -57,22 +46,28 @@ def test_canReceiveMoney(reimbursementContract, accounts):
     accounts[2].transfer(reimbursementContract, depositAmount, gas_price=0)
     assert reimbursementContract.balance() == (depositAmount * 2), "Contract should be able to receive money"
 
+#def test_isElligibleForReimbursement(reimburesementContract, accounts):
+#    assert 
+
+
 # @Notice Relies on 'canDisabled' 'canAddUser'
 def test_canReimburseMoney(reimbursementContract, accounts):
-    # Add money, set grad year, and an active user
-    targetReimbursementAccount = accounts[4]
+
+    #non active user 2022 year
+    nonActiveUser = accounts[2]
+
+    #active user 2023 year
+    targetReimbursementAccount = accounts[3]
+
     adminAccount = accounts[1]
     ownerAccount = accounts[0]
+
     # https://vyper.readthedocs.io/en/stable/built-in-functions.html?highlight=send#send
     # send uses wei value to send to the address
     txnGasPriceToRepay = _as_wei_value(800577, "gwei")
     depositAmount = _as_wei_value(0.01, "ether")
     accounts[0].transfer(reimbursementContract, depositAmount, gas_price=0)
     assert reimbursementContract.balance() == depositAmount, "Contract should have received eth"
-
-    reimbursementContract.setCurrentGradYear(2023)
-    reimbursementContract.addUser(targetReimbursementAccount,  {'from': adminAccount})
-    assert reimbursementContract.getUserGradYear(targetReimbursementAccount) == 2023, "Should set user grad year"
 
     txn01 = reimbursementContract.setDisableContract(True, {'from':ownerAccount})
 
@@ -92,7 +87,7 @@ def test_canReimburseMoney(reimbursementContract, accounts):
 # @Notice Relies on 'canAddUser', and 'canReimburseMoney'
 def test_userHitMaxReimbursement(reimbursementContract, accounts):
     adminAccount = accounts[1]
-    targetReimbursementAccount = accounts[4]
+    targetReimbursementAccount = accounts[3]
 
     # Test needs to make sure we can reimburse a 3 times and leaves buffer
     # 0.004 each txn + 0.0005 buffer
@@ -104,10 +99,6 @@ def test_userHitMaxReimbursement(reimbursementContract, accounts):
     # Add money, set grad year, and an active user
     accounts[0].transfer(reimbursementContract, depositAmount, gas_price=0)
     assert reimbursementContract.balance() == depositAmount, "Contract should have received eth"
-
-    reimbursementContract.setCurrentGradYear(2023)
-    reimbursementContract.addUser(targetReimbursementAccount,  {'from': adminAccount})
-    assert reimbursementContract.getUserGradYear(targetReimbursementAccount) == 2023, "Should set user grad year"
 
     # Set how much wei we each user can be reimbursed
     setCapTxn = reimbursementContract.setUserIndividualWeiReimbursementCap(totalReimbursementAllowed, {'from': adminAccount, 'gas_price' : 0, 'gas' : DEFAULT_GAS})
@@ -133,7 +124,7 @@ def test_userHitMaxReimbursement(reimbursementContract, accounts):
 
 def test_contractOutOfEth(reimbursementContract, accounts):
     adminAccount = accounts[1]
-    targetReimbursementAccount = accounts[4]
+    targetReimbursementAccount = accounts[3]
 
     # Test needs to make sure we can reimburse a 3 times and leaves buffer
     # 0.004 each txn + 0.0005 buffer
@@ -145,10 +136,6 @@ def test_contractOutOfEth(reimbursementContract, accounts):
     # Add money, set grad year, and an active user
     accounts[0].transfer(reimbursementContract, depositAmount, gas_price=0)
     assert reimbursementContract.balance() == depositAmount, "Contract should have received eth"
-
-    reimbursementContract.setCurrentGradYear(2023)
-    reimbursementContract.addUser(targetReimbursementAccount,  {'from': adminAccount})
-    assert reimbursementContract.getUserGradYear(targetReimbursementAccount) == 2023, "Should set user grad year"
 
     # Set how much wei we each user can be reimbursed
     setCapTxn = reimbursementContract.setUserIndividualWeiReimbursementCap(totalReimbursementAllowed, {'from': adminAccount, 'gas_price' : 0, 'gas' : DEFAULT_GAS})
@@ -185,10 +172,6 @@ def test_willOnlyReimburseStudents(reimbursementContract, accounts):
     # Add money, set grad year, and an active user
     accounts[0].transfer(reimbursementContract, depositAmount, gas_price=0)
     assert reimbursementContract.balance() == depositAmount, "Contract should have received eth"
-
-    reimbursementContract.setCurrentGradYear(2023)
-    reimbursementContract.addUser(targetReimbursementAccount,  {'from': adminAccount})
-    assert reimbursementContract.getUserGradYear(targetReimbursementAccount) == 2023, "Should set user grad year"
 
     # Set how much wei we each user can be reimbursed
     setCapTxn = reimbursementContract.setUserIndividualWeiReimbursementCap(totalReimbursementAllowed, {'from': adminAccount, 'gas_price' : 0, 'gas' : DEFAULT_GAS})
