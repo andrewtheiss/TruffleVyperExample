@@ -6,6 +6,7 @@ admins: public(HashMap[address, bool])
 owner: address
 disabled: bool
 
+
 event SetGradYear:
     user: address
     year: uint256
@@ -80,5 +81,4 @@ def setCurrentGradYear(year: uint256):
     assert not self.disabled, "This contract and its features are disabled"
     assert self.admins[msg.sender] == True, "Only admins can add active students"
     self.currentGradYear = year
-    log SetGradYear(msg.sender, year) 
-
+    log SetGradYear(msg.sender, year)
